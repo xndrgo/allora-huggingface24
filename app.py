@@ -17,13 +17,11 @@ def get_coingecko_url(token):
         'ETH': 'ethereum',
         'SOL': 'solana',
         'BTC': 'bitcoin',
-        'BNB': 'binancecoin',
-        'ARB': 'arbitrum'
     }
     
     token = token.upper()
     if token in token_map:
-        url = f"{base_url}{token_map[token]}/market_chart?vs_currency=usd&days=30&interval=daily"
+        url = f"{base_url}{token_map[token]}/market_chart?vs_currency=usd&days=30&interval=hourly"
         return url
     else:
         raise ValueError("Unsupported token")
@@ -50,7 +48,7 @@ def get_inference(token):
 
     headers = {
         "accept": "application/json",
-        "x-cg-demo-api-key": "<Your Coingecko API key>" # replace with your API key
+        "x-cg-demo-api-key": "CG-your_api_key"  # замените на ваш API ключ
     }
 
     response = requests.get(url, headers=headers)
@@ -59,7 +57,7 @@ def get_inference(token):
         df = pd.DataFrame(data["prices"])
         df.columns = ["date", "price"]
         df["date"] = pd.to_datetime(df["date"], unit='ms')
-        df = df[:-1] # removing today's price
+        df = df[:-1]  # удаление сегодняшней цены
         print(df.tail(5))
     else:
         return Response(json.dumps({"Failed to retrieve data from the API": str(response.text)}), 
@@ -68,12 +66,12 @@ def get_inference(token):
 
     # define the context and the prediction length
     context = torch.tensor(df["price"])
-    prediction_length = 1
+    prediction_length = 24  # предсказываем на следующие 24 часа
 
     try:
         forecast = pipeline.predict(context, prediction_length)  # shape [num_series, num_samples, prediction_length]
-        print(forecast[0].mean().item()) # taking the mean of the forecasted prediction
-        return Response(str(forecast[0].mean().item()), status=200)
+        # Возвращаем среднюю предсказанную цену через 24 часа
+        return Response(str(forecast[-1].mean().item()), status=200)
     except Exception as e:
         return Response(json.dumps({"error": str(e)}), status=500, mimetype='application/json')
 
