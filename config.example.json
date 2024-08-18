@@ -1,24 +1,42 @@
 {
-    "wallet": {
-        "addressKeyName": "test",
-        "addressRestoreMnemonic": "",
-        "alloraHomeDir": "",
-        "gas": "1000000",
-        "gasAdjustment": 1.0,
-        "nodeRpc": "http://localhost:26657",
-        "maxRetries": 1,
-        "delay": 1,
-        "submitTx": false
-    },
-    "worker": [
-        {
-            "topicId": 4,
-            "inferenceEntrypointName": "api-worker-reputer",
-            "loopSeconds": 5,
-            "parameters": {
-                "InferenceEndpoint": "http://inference:8000/inference/{Token}",
-                "Token": "BTC"
-            }
-        }
-    ]
+   "wallet": {
+       "addressKeyName": "test",
+       "addressRestoreMnemonic": "your phase",
+       "alloraHomeDir": "/root/.allorad",
+       "gas": "1000000",
+       "gasAdjustment": 1.0,
+       "nodeRpc": "https://sentries-rpc.testnet-1.testnet.allora.network/",
+       "maxRetries": 1,
+       "delay": 1,
+       "submitTx": false
+   },
+   "worker": [
+       {
+           "topicId": 1,
+           "inferenceEntrypointName": "api-worker-reputer",
+           "loopSeconds": 86400,  # Запускать каждый день (24 часа = 86400 секунд)
+           "parameters": {
+               "InferenceEndpoint": "http://inference:8000/inference/{Token}",
+               "Token": "ETH"
+           }
+       },
+       {
+           "topicId": 2,
+           "inferenceEntrypointName": "api-worker-reputer",
+           "loopSeconds": 86400,  # Запускать каждый день
+           "parameters": {
+               "InferenceEndpoint": "http://inference:8000/inference/{Token}",
+               "Token": "BTC"
+           }
+       },
+       {
+           "topicId": 3,
+           "inferenceEntrypointName": "api-worker-reputer",
+           "loopSeconds": 86400,  # Запускать каждый день
+           "parameters": {
+               "InferenceEndpoint": "http://inference:8000/inference/{Token}",
+               "Token": "SOL"
+           }
+       }
+   ]
 }
