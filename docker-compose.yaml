@@ -9,7 +9,7 @@ services:
       - "8000:8000"
 
   worker:
-    container_name: worker
+    container_name: worker24
     image: alloranetwork/allora-offchain-node:latest
     volumes:
       - ./worker-data:/data
