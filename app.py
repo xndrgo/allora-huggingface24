@@ -3,21 +3,13 @@ import requests
 import json
 import pandas as pd
 import torch
-from pytorch_forecasting import TemporalFusionTransformer, TimeSeriesDataSet
-from pytorch_lightning import Trainer
+from chronos import ChronosPipeline
 
 # create our Flask app
 app = Flask(__name__)
 
-# Define the path to your trained TFT model
-model_path = "path_to_your_trained_tft_model"
-
-# Load your trained TFT model
-model = TemporalFusionTransformer.load_from_checkpoint(model_path)
-
-# Define the parameters for your TFT model
-max_encoder_length = 30  # Example length, adjust as needed
-max_prediction_length = 1
+# define the Hugging Face model we will use
+model_name = "amazon/chronos-t5-tiny"
 
 def get_coingecko_url(token):
     base_url = "https://api.coingecko.com/api/v3/coins/"
@@ -36,61 +28,67 @@ def get_coingecko_url(token):
     else:
         raise ValueError("Unsupported token")
 
+# define our endpoint for 10-minute prediction
 @app.route("/inference/<string:token>")
 def get_inference(token):
-    """Generate inference for given token."""
+    """Generate inference for given token for the next 10 minutes."""
+    return run_inference(token, prediction_length=1)
+
+# define our endpoint for 20-minute prediction
+@app.route("/inference20m/<string:token>")
+def get_inference_20m(token):
+    """Generate inference for given token for the next 20 minutes."""
+    return run_inference(token, prediction_length=2)
+
+# define our endpoint for 24-hour prediction
+@app.route("/inference24h/<string:token>")
+def get_inference_24h(token):
+    """Generate inference for given token for the next 24 hours."""
+    return run_inference(token, prediction_length=24)
+
+def run_inference(token, prediction_length):
+    """Helper function to perform inference with specified prediction length."""
     try:
-        # Get the data from Coingecko
+        pipeline = ChronosPipeline.from_pretrained(
+            model_name,
+            device_map="auto",
+            torch_dtype=torch.bfloat16,
+        )
+    except Exception as e:
+        return Response(json.dumps({"pipeline error": str(e)}), status=500, mimetype='application/json')
+
+    try:
         url = get_coingecko_url(token)
     except ValueError as e:
         return Response(json.dumps({"error": str(e)}), status=400, mimetype='application/json')
 
     headers = {
         "accept": "application/json",
-        "x-cg-demo-api-key": "CG-your_api_key"  # Replace with your API key
+        "x-cg-demo-api-key": "CG-your_api_key"  # replace with your API key
     }
 
     response = requests.get(url, headers=headers)
     if response.status_code == 200:
         data = response.json()
-        df = pd.DataFrame(data["prices"], columns=["timestamp", "price"])
-        df["timestamp"] = pd.to_datetime(df["timestamp"], unit='ms')
-        df = df.set_index("timestamp")
+        df = pd.DataFrame(data["prices"])
+        df.columns = ["date", "price"]
+        df["date"] = pd.to_datetime(df["date"], unit='ms')
+        df = df[:-1]  # removing today's price
+        print(df.tail(5))
     else:
-        return Response(json.dumps({"Failed to retrieve data from the API": str(response.text)}), 
-                        status=response.status_code, 
+        return Response(json.dumps({"Failed to retrieve data from the API": str(response.text)}),
+                        status=response.status_code,
                         mimetype='application/json')
 
-    # Prepare data for the model
-    df = df[['price']]
-    df = df.reset_index()
-    dataset = TimeSeriesDataSet(
-        df,
-        time_idx="timestamp",
-        target="price",
-        max_encoder_length=max_encoder_length,
-        max_prediction_length=max_prediction_length,
-    )
+    context = torch.tensor(df["price"])
 
-    # Create dataloader
-    dataloader = torch.utils.data.DataLoader(dataset, batch_size=1)
-
-    # Generate prediction
     try:
-        model.eval()
-        predictions = []
-        for batch in dataloader:
-            x, y = batch
-            with torch.no_grad():
-                pred = model(x)
-            predictions.append(pred)
-        
-        # Assuming you want the mean of the predictions
-        prediction_mean = torch.mean(torch.stack(predictions))
-        return Response(str(prediction_mean.item()), status=200)
+        forecast = pipeline.predict(context, prediction_length)  # shape [num_series, num_samples, prediction_length]
+        print(forecast[0].mean().item())  # taking the mean of the forecasted prediction
+        return Response(str(forecast[0].mean().item()), status=200)
     except Exception as e:
         return Response(json.dumps({"error": str(e)}), status=500, mimetype='application/json')
 
-# Run our Flask app
+# run our Flask app
 if __name__ == '__main__':
     app.run(host="0.0.0.0", port=8000, debug=True)
