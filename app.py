@@ -2,15 +2,15 @@ from flask import Flask, Response
 import requests
 import json
 import pandas as pd
-import torch
-from chronos import ChronosPipeline
+from sklearn.linear_model import LinearRegression
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import mean_squared_error
+import numpy as np
 
-# create our Flask app
+# Создаем Flask приложение
 app = Flask(__name__)
 
-# define the Hugging Face model we will use
-model_name = "amazon/chronos-t5-tiny"
-
+# Функция для получения данных с Coingecko
 def get_coingecko_url(token):
     base_url = "https://api.coingecko.com/api/v3/coins/"
     token_map = {
@@ -28,35 +28,41 @@ def get_coingecko_url(token):
     else:
         raise ValueError("Unsupported token")
 
-# define our endpoint for 10-minute prediction
+# Предобработка данных
+def preprocess_data(data):
+    df = pd.DataFrame(data["prices"], columns=["date", "price"])
+    df["date"] = pd.to_datetime(df["date"], unit='ms')
+    df["price_change"] = df["price"].pct_change()  # добавляем столбец с процентным изменением цен
+    df = df.dropna()  # убираем строки с NaN
+    return df
+
+# Обучение и предсказание модели
+def train_and_predict(df, days_ahead=1):
+    X = np.array(df.index).reshape(-1, 1)  # Даты как индекс
+    y = df["price"].values
+
+    # Разделение данных на обучающую и тестовую выборку
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+    # Обучение модели линейной регрессии
+    model = LinearRegression()
+    model.fit(X_train, y_train)
+
+    # Предсказание на следующий период
+    last_index = np.array([[df.index[-1] + days_ahead]])
+    predicted_price = model.predict(last_index)
+
+    # Оценка модели
+    y_pred = model.predict(X_test)
+    mse = mean_squared_error(y_test, y_pred)
+    print(f"Mean Squared Error: {mse}")
+
+    return predicted_price[0]
+
+# Определяем endpoint
 @app.route("/inference/<string:token>")
 def get_inference(token):
-    """Generate inference for given token for the next 10 minutes."""
-    return run_inference(token, prediction_length=1)
-
-# define our endpoint for 20-minute prediction
-@app.route("/inference20m/<string:token>")
-def get_inference_20m(token):
-    """Generate inference for given token for the next 20 minutes."""
-    return run_inference(token, prediction_length=2)
-
-# define our endpoint for 24-hour prediction
-@app.route("/inference24h/<string:token>")
-def get_inference_24h(token):
-    """Generate inference for given token for the next 24 hours."""
-    return run_inference(token, prediction_length=24)
-
-def run_inference(token, prediction_length):
-    """Helper function to perform inference with specified prediction length."""
-    try:
-        pipeline = ChronosPipeline.from_pretrained(
-            model_name,
-            device_map="auto",
-            torch_dtype=torch.bfloat16,
-        )
-    except Exception as e:
-        return Response(json.dumps({"pipeline error": str(e)}), status=500, mimetype='application/json')
-
+    """Генерация предсказания для заданного токена."""
     try:
         url = get_coingecko_url(token)
     except ValueError as e:
@@ -64,31 +70,20 @@ def run_inference(token, prediction_length):
 
     headers = {
         "accept": "application/json",
-        "x-cg-demo-api-key": "CG-your_api_key"  # replace with your API key
+        "x-cg-demo-api-key": "CG-your_api_key" # Замените на ваш API ключ
     }
 
     response = requests.get(url, headers=headers)
     if response.status_code == 200:
         data = response.json()
-        df = pd.DataFrame(data["prices"])
-        df.columns = ["date", "price"]
-        df["date"] = pd.to_datetime(df["date"], unit='ms')
-        df = df[:-1]  # removing today's price
-        print(df.tail(5))
+        df = preprocess_data(data)
+        predicted_price = train_and_predict(df, days_ahead=1)  # Прогноз на следующий день
+        return Response(json.dumps({"predicted_price": predicted_price}), status=200, mimetype='application/json')
     else:
-        return Response(json.dumps({"Failed to retrieve data from the API": str(response.text)}),
-                        status=response.status_code,
+        return Response(json.dumps({"error": "Failed to retrieve data from the API"}), 
+                        status=response.status_code, 
                         mimetype='application/json')
 
-    context = torch.tensor(df["price"])
-
-    try:
-        forecast = pipeline.predict(context, prediction_length)  # shape [num_series, num_samples, prediction_length]
-        print(forecast[0].mean().item())  # taking the mean of the forecasted prediction
-        return Response(str(forecast[0].mean().item()), status=200)
-    except Exception as e:
-        return Response(json.dumps({"error": str(e)}), status=500, mimetype='application/json')
-
-# run our Flask app
+# Запуск Flask приложения
 if __name__ == '__main__':
     app.run(host="0.0.0.0", port=8000, debug=True)
