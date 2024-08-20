@@ -14,82 +14,82 @@
        {
            "topicId": 1,
            "inferenceEntrypointName": "api-worker-reputer",
-           "loopSeconds": 1,
+           "loopSeconds": 600,
            "parameters": {
-               "InferenceEndpoint": "http://inference:8000/inference/{Token}",
-               "Token": "ETH"
-           }
-       },
-       {
-           "topicId": 2, 
-           "inferenceEntrypointName": "api-worker-reputer",
-           "loopSeconds": 1,
-           "parameters": {
-               "InferenceEndpoint": "http://inference:8000/inference24h/{Token}",
+               "InferenceEndpoint": "http://inference:8000/inference/ETH",
                "Token": "ETH"
            }
        },
        {
            "topicId": 3,
            "inferenceEntrypointName": "api-worker-reputer",
-           "loopSeconds": 5,
+           "loopSeconds": 600,
            "parameters": {
-               "InferenceEndpoint": "http://inference:8000/inference/{Token}",
-               "Token": "BTC"
-           }
-       },
-       {
-           "topicId": 4, 
-           "inferenceEntrypointName": "api-worker-reputer",
-           "loopSeconds": 3,
-           "parameters": {
-               "InferenceEndpoint": "http://inference:8000/inference24h/{Token}",
+               "InferenceEndpoint": "http://inference:8000/inference/BTC",
                "Token": "BTC"
            }
        },
        {
            "topicId": 5,
            "inferenceEntrypointName": "api-worker-reputer",
-           "loopSeconds": 4,
+           "loopSeconds": 600,
            "parameters": {
-               "InferenceEndpoint": "http://inference:8000/inference/{Token}",
-               "Token": "SOL"
-           }
-       },
-       {
-           "topicId": 6, 
-           "inferenceEntrypointName": "api-worker-reputer",
-           "loopSeconds": 4,
-           "parameters": {
-               "InferenceEndpoint": "http://inference:8000/inference24h/{Token}",
+               "InferenceEndpoint": "http://inference:8000/inference/SOL",
                "Token": "SOL"
            }
        },
        {
            "topicId": 7,
            "inferenceEntrypointName": "api-worker-reputer",
-           "loopSeconds": 2,
+           "loopSeconds": 1200,
            "parameters": {
-               "InferenceEndpoint": "http://inference:8000/inference20m/{Token}",
+               "InferenceEndpoint": "http://inference:8000/inference/ETH",
                "Token": "ETH"
            }
        },
        {
            "topicId": 8,
            "inferenceEntrypointName": "api-worker-reputer",
-           "loopSeconds": 3,
+           "loopSeconds": 1200,
            "parameters": {
-               "InferenceEndpoint": "http://inference:8000/inference20m/{Token}",
+               "InferenceEndpoint": "http://inference:8000/inference/BNB",
                "Token": "BNB"
            }
        },
        {
            "topicId": 9,
            "inferenceEntrypointName": "api-worker-reputer",
-           "loopSeconds": 5,
+           "loopSeconds": 1200,
            "parameters": {
-               "InferenceEndpoint": "http://inference:8000/inference20m/{Token}",
+               "InferenceEndpoint": "http://inference:8000/inference/ARB",
                "Token": "ARB"
+           }
+       },
+       {
+           "topicId": 2,
+           "inferenceEntrypointName": "api-worker-reputer",
+           "loopSeconds": 86400,
+           "parameters": {
+               "InferenceEndpoint": "http://inference:8000/inference/ETH",
+               "Token": "ETH"
+           }
+       },
+       {
+           "topicId": 4,
+           "inferenceEntrypointName": "api-worker-reputer",
+           "loopSeconds": 86400,
+           "parameters": {
+               "InferenceEndpoint": "http://inference:8000/inference/BTC",
+               "Token": "BTC"
+           }
+       },
+       {
+           "topicId": 6,
+           "inferenceEntrypointName": "api-worker-reputer",
+           "loopSeconds": 86400,
+           "parameters": {
+               "InferenceEndpoint": "http://inference:8000/inference/SOL",
+               "Token": "SOL"
            }
        }
    ]
