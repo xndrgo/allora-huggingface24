@@ -2,15 +2,23 @@ from flask import Flask, Response
 import requests
 import json
 import pandas as pd
-from sklearn.linear_model import LinearRegression
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import mean_squared_error
-import numpy as np
+import torch
+from pytorch_forecasting import TemporalFusionTransformer
+from pytorch_forecasting import TimeSeriesDataSet
 
-# Создаем Flask приложение
+# create our Flask app
 app = Flask(__name__)
 
-# Функция для получения данных с Coingecko
+# Define the path to your trained TFT model
+model_path = "path_to_your_trained_tft_model"
+
+# Load your trained TFT model
+model = TemporalFusionTransformer.load_from_checkpoint(model_path)
+
+# Define the parameters for your TFT model
+max_encoder_length = 30  # Example length, adjust as needed
+max_prediction_length = 1
+
 def get_coingecko_url(token):
     base_url = "https://api.coingecko.com/api/v3/coins/"
     token_map = {
@@ -28,62 +36,61 @@ def get_coingecko_url(token):
     else:
         raise ValueError("Unsupported token")
 
-# Предобработка данных
-def preprocess_data(data):
-    df = pd.DataFrame(data["prices"], columns=["date", "price"])
-    df["date"] = pd.to_datetime(df["date"], unit='ms')
-    df["price_change"] = df["price"].pct_change()  # добавляем столбец с процентным изменением цен
-    df = df.dropna()  # убираем строки с NaN
-    return df
-
-# Обучение и предсказание модели
-def train_and_predict(df, days_ahead=1):
-    X = np.array(df.index).reshape(-1, 1)  # Даты как индекс
-    y = df["price"].values
-
-    # Разделение данных на обучающую и тестовую выборку
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
-
-    # Обучение модели линейной регрессии
-    model = LinearRegression()
-    model.fit(X_train, y_train)
-
-    # Предсказание на следующий период
-    last_index = np.array([[df.index[-1] + days_ahead]])
-    predicted_price = model.predict(last_index)
-
-    # Оценка модели
-    y_pred = model.predict(X_test)
-    mse = mean_squared_error(y_test, y_pred)
-    print(f"Mean Squared Error: {mse}")
-
-    return predicted_price[0]
-
-# Определяем endpoint
 @app.route("/inference/<string:token>")
 def get_inference(token):
-    """Генерация предсказания для заданного токена."""
+    """Generate inference for given token."""
     try:
+        # Get the data from Coingecko
         url = get_coingecko_url(token)
     except ValueError as e:
         return Response(json.dumps({"error": str(e)}), status=400, mimetype='application/json')
 
     headers = {
         "accept": "application/json",
-        "x-cg-demo-api-key": "CG-your_api_key" # Замените на ваш API ключ
+        "x-cg-demo-api-key": "CG-your_api_key"  # Replace with your API key
     }
 
     response = requests.get(url, headers=headers)
     if response.status_code == 200:
         data = response.json()
-        df = preprocess_data(data)
-        predicted_price = train_and_predict(df, days_ahead=1)  # Прогноз на следующий день
-        return Response(json.dumps({"predicted_price": predicted_price}), status=200, mimetype='application/json')
+        df = pd.DataFrame(data["prices"], columns=["timestamp", "price"])
+        df["timestamp"] = pd.to_datetime(df["timestamp"], unit='ms')
+        df = df.set_index("timestamp")
     else:
-        return Response(json.dumps({"error": "Failed to retrieve data from the API"}), 
+        return Response(json.dumps({"Failed to retrieve data from the API": str(response.text)}), 
                         status=response.status_code, 
                         mimetype='application/json')
 
-# Запуск Flask приложения
+    # Prepare data for the model
+    df = df[['price']]
+    df = df.reset_index()
+    dataset = TimeSeriesDataSet(
+        df,
+        time_idx="timestamp",
+        target="price",
+        max_encoder_length=max_encoder_length,
+        max_prediction_length=max_prediction_length,
+    )
+
+    # Create dataloader
+    dataloader = torch.utils.data.DataLoader(dataset, batch_size=1)
+
+    # Generate prediction
+    try:
+        model.eval()
+        predictions = []
+        for batch in dataloader:
+            x, y = batch
+            with torch.no_grad():
+                pred = model(x)
+            predictions.append(pred)
+        
+        # Assuming you want the mean of the predictions
+        prediction_mean = torch.mean(torch.stack(predictions))
+        return Response(str(prediction_mean.item()), status=200)
+    except Exception as e:
+        return Response(json.dumps({"error": str(e)}), status=500, mimetype='application/json')
+
+# Run our Flask app
 if __name__ == '__main__':
     app.run(host="0.0.0.0", port=8000, debug=True)
