@@ -1,6 +1,6 @@
 {
    "wallet": {
-       "addressKeyName": "test",
+       "addressKeyName": "testkey",
        "addressRestoreMnemonic": "your phase",
        "alloraHomeDir": "/root/.allorad",
        "gas": "1000000",
